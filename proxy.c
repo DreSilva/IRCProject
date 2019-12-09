@@ -3,56 +3,49 @@
 #include <resolv.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
 #include<unistd.h>
 #include<netdb.h> //hostent
 #include<arpa/inet.h>
-int hostname_to_ip(char * , char *);
-// A structure to maintain client fd, and server ip address and port address
-// client will establish connection to server using given IP and port
-struct serverInfo
-{
-     int client_fd;
-     char ip[100];
-     char port[100];
-     char protocol[3];
-};
+
 // A thread function
 // A thread for each client request
-void *new_client(void *server)
-{
-  struct serverInfo *info = (struct serverInfo *)server;
-  char buffer[65535];
+struct info{
+  int client_fd;
+  struct sockaddr_in server_addr;
+};
+void *new_client(void *info){
+  struct info* client_server = (struct info*)info;
+  struct sockaddr_in server_addr =client_server->server_addr;
+  int server_fd,client_fd=client_server->client_fd;
+  char buffer[65535],server_ip[100];
   int bytes=0;
-     printf("client:%d\n",info->client_fd);
+
      //code to connect to main server via this proxy server
-     int server_fd=0;
-     struct sockaddr_in server_sd;
      // create a socket
      if(server_fd = socket(AF_INET, SOCK_STREAM, 0) < 0){
           printf("server socket not created\n");
           exit(-1);
-        }
+     }
+     printf("Server address: %s port: %d\n",inet_ntoa(server_addr.sin_addr),ntohs(server_addr.sin_port));
      printf("server socket created\n");
-     memset(&server_sd, 0, sizeof(server_sd));
-     // set socket variables
-     server_sd.sin_family = AF_INET;
-     server_sd.sin_port = htons(atoi(info->port));
-     server_sd.sin_addr.s_addr = inet_addr(info->ip);
      //connect to main server from this proxy server
-     if((connect(server_fd, (struct sockaddr *)&server_sd, sizeof(server_sd)))<0)
-          printf("server connection not established");
+     if((connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr)))<0){
+          printf("server connection failed\n");
+          exit(-1);
+     }
+     printf("server address %s\n",inet_ntoa(server_addr.sin_addr));
      printf("server socket connected\n");
      while(1)
      {
           //receive data from client
           memset(&buffer, '\0', sizeof(buffer));
-          bytes = read(info->client_fd, buffer, sizeof(buffer));
+          bytes = read(client_fd, buffer, sizeof(buffer));
           if(bytes>0){
              // send data to main server
              write(server_fd, buffer, sizeof(buffer));
-             //printf("client fd is : %d\n",c_fd);
-             printf("From client :\n");
+             printf("From client:\n");
              fputs(buffer,stdout);
              fflush(stdout);
           }
@@ -61,51 +54,49 @@ void *new_client(void *server)
             memset(&buffer, '\0', sizeof(buffer));
             //enviar o ficheiro*************************************************
           }
-          else if((strcmp(buffer,"LIST")==0){
+          else if(strcmp(buffer,"LIST")==0){
             memset(&buffer, '\0', sizeof(buffer));
             bytes = read(server_fd, buffer, sizeof(buffer));
-            write(info->client_fd,buffer,sizeof(buffer))
+            write(client_fd,buffer,sizeof(buffer));
           }
-          else if((strcmp(buffer,"QUIT")==0){
+          else if(strcmp(buffer,"QUIT")==0){
             printf("The client thread %d will now close",client_fd);
-            close(info->client_fd);
+            close(client_fd);
             pthread_exit(NULL);
           }
      };
   return NULL;
 }
 // main entry point
-int main(int argc,char *argv[])
-{
+int main(int argc,char *argv[]){
     pthread_t tid;
-    char port[100],ip[100];
+    char port[100],ip[100],buffer[100];
     char *hostname = argv[1];
-    char proxy_port[100]=argv[1];
+    char proxy_port[100];
     //socket variables
     int proxy_fd=0, client_fd=0;
-    struct sockaddr_in proxy_sd;
-    if(argc!=1){
-      printf("ircproxy <portos>\n", );
+    struct sockaddr_in proxy_addr,server_addr;
+    struct info *info_ptr;
+    if(argc!=2){
+      printf("./proxy <portos>\n");
       exit(-1);
     }
      // accept arguments from terminal
-     //strcpy(ip,argv[1]); // server ip
-     //strcpy(port,argv[2]);  // server port
      strcpy(proxy_port,argv[1]); // proxy port
-     //hostname_to_ip(hostname , ip);
-     printf("proxy port is %s",proxy_port);
-     printf("\n");
+     printf("proxy port is %s\n",proxy_port);
      // create a socket
-     if((proxy_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+     if((proxy_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
          printf("\nFailed to create socket");
+         exit(-1);
+     }
      printf("Proxy initialize\n");
-     memset(&proxy_sd, 0, sizeof(proxy_sd));
+     memset(&proxy_addr, 0, sizeof(proxy_addr));
      // set socket variables
-     proxy_sd.sin_family = AF_INET;
-     proxy_sd.sin_port = htons(atoi(proxy_port));
-     proxy_sd.sin_addr.s_addr = INADDR_ANY;
+     proxy_addr.sin_family = AF_INET;
+     proxy_addr.sin_port = htons(atoi(proxy_port));
+     inet_pton(AF_INET,"127.0.0.1", &(proxy_addr.sin_addr));
      // bind the socket
-     if((bind(proxy_fd, (struct sockaddr*)&proxy_sd,sizeof(proxy_sd))) < 0)
+     if((bind(proxy_fd, (struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0)
         printf("Failed to bind a socket");
 
      // start listening to the port for new connections
@@ -116,14 +107,13 @@ int main(int argc,char *argv[])
      {
           client_fd = accept(proxy_fd, (struct sockaddr*)NULL ,NULL);
           printf("client no. %d connected\n",client_fd);
-          if(client_fd > 0)
-          {
+          if(client_fd > 0){
                 //multithreading variables
-                struct serverInfo *info = malloc(sizeof(struct serverInfo));
-                info->client_fd = client_fd;
-                strcpy(info->ip,"127.0.0.1");
-                strcpy(info->port,"9000");
-                pthread_create(&tid, NULL, new_client, (void *)info);
+                read(client_fd,&server_addr,sizeof(server_addr));
+                info_ptr=(struct info*)malloc(sizeof(struct info));
+                info_ptr->server_addr=server_addr;
+                info_ptr->client_fd=client_fd;
+                pthread_create(&tid, NULL, new_client, (void *)info_ptr);
                 sleep(1);
           }
      }

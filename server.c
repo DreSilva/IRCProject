@@ -16,6 +16,7 @@
 
 #define BUF_SIZE	1024
 
+
 void process_client(int fd);
 void erro(char *msg);
 
@@ -28,22 +29,26 @@ int main(int argc, char *argv[]) {
   int client_addr_size;
 
   if(argc!=3){
-    printf("server <port> <max number of clients>\n", );
+    printf("./server <port> <max number of clients>\n");
+    exit(-1);
   }
   server_port=atoi(argv[1]);
   max_number_of_clients=atoi(argv[2]);
 
   bzero((void *) &addr, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  addr.sin_port = htons(SERVER_PORT);
+  inet_pton(AF_INET,"127.0.0.2", &(addr.sin_addr));
+  addr.sin_port = htons(server_port);
 
   if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	   erro("na funcao socket");
+	   erro("in socket function");
+  printf("Socket created\n");
   if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0)
-	   erro("na funcao bind");
+	   erro("in bind function");
+  printf("Bind successfull\n");
   if( listen(fd, 5) < 0)
-	   erro("na funcao listen");
+	   erro("in listen function");
+  printf("Listen successfull\n");
   client_addr_size = sizeof(client_addr);
   while (1) {
     //clean finished child processes, avoiding zombies
