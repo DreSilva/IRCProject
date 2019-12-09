@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <arpa/inet.h>
+#include <dirent.h>
 
 #define BUF_SIZE	1024
 
@@ -40,7 +41,7 @@ int main(int argc, char *argv[]) {
   inet_pton(AF_INET,"127.0.0.2", &(addr.sin_addr));
   addr.sin_port = htons(server_port);
 
-  if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+  if ( (fd = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0)
 	   erro("in socket function");
   printf("Socket created\n");
   if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0)
@@ -75,10 +76,12 @@ void process_client(int client_fd)
 {
 	int nread = 0,size=10,i;
 	char buffer[BUF_SIZE],*token,message[90];
-  char str_dados[100];
+  char str_list[10000],str_fich_info[257];
   int dados[size];
   int sum=0,flag=0;
   double ave=0;
+  struct dirent *info_dir;  // Pointer for directory entry
+  DIR *directory;
 
   memset(dados,-1,size*sizeof(int));
 
@@ -91,7 +94,20 @@ void process_client(int client_fd)
         //arranjar forma de enviar o ficheiro***********************************
       }
       else if (strcmp(buffer,"LIST")==0){
-        //enviarlistadeficheiros************************************************
+        // opendir() returns a pointer of DIR type.
+        directory = opendir("server_files");
+        if (directory == NULL){  // opendir returns NULL if couldn't open directory
+            printf("Couldn't open current directory;" );
+        }
+        memset(&str_list,'\0', sizeof(str_list));
+        while ((info_dir = readdir(directory)) != NULL){
+                sprintf(str_fich_info,"%s\n", info_dir->d_name);
+                strcat(str_list,str_fich_info);
+        }
+        printf("%s",str_list);
+
+
+        closedir(directory);
       }
       else if (strcmp(buffer,"Quit")==0){
         printf("The client %d will now close.\n",client_fd);

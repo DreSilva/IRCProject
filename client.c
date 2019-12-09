@@ -13,6 +13,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+
 void erro(char *msg);
 
 int main(int argc, char *argv[]) {
@@ -43,7 +44,7 @@ int main(int argc, char *argv[]) {
   server_addr.sin_port = htons((short) atoi(argv[3]));
 
   if(strcmp(argv[4],"TCP")==0){
-    if((fd_proxy = socket(AF_INET,SOCK_STREAM,0)) == -1)
+    if((fd_proxy = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP)) == -1)
   	 erro("Error creating socket");
     if( connect(fd_proxy,(struct sockaddr*)&proxy_addr,sizeof(proxy_addr)) < 0)
   	 erro("Error on connection to the proxy");
@@ -57,7 +58,9 @@ int main(int argc, char *argv[]) {
       if(strcmp(command,"LIST")==0){
         write(fd_proxy,command,sizeof(command));
         read(fd_proxy,received,sizeof(received));
+        printf("LISTA DE PROJETOS RECEBIDOS\n-----------------------------------------");
         printf("%s",received);
+        printf("\n-----------------------------------------");
       }
       else if(strncmp(command,"DOWNLOAD",8)==0){
         write(fd_proxy,command,sizeof(command));
@@ -65,7 +68,7 @@ int main(int argc, char *argv[]) {
       }
       else if(strcmp(command,"QUIT")==0){
         write(fd_proxy,command,sizeof(command));
-        printf("O cliente vai desconetar\n");
+        printf("The client will now turn off\n");
         close(fd_proxy);
         exit(0);
       }

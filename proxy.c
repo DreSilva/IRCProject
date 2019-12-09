@@ -8,6 +8,7 @@
 #include<unistd.h>
 #include<netdb.h> //hostent
 #include<arpa/inet.h>
+#include<errno.h>
 
 // A thread function
 // A thread for each client request
@@ -16,27 +17,27 @@ struct info{
   struct sockaddr_in server_addr;
 };
 void *new_client(void *info){
-  struct info* client_server = (struct info*)info;
-  struct sockaddr_in server_addr =client_server->server_addr;
-  int server_fd,client_fd=client_server->client_fd;
+  struct info client_server = *(struct info*)info;
+  struct sockaddr_in server_addr =client_server.server_addr;
+  int server_fd,client_fd=client_server.client_fd;
   char buffer[65535],server_ip[100];
   int bytes=0;
 
      //code to connect to main server via this proxy server
      // create a socket
-     if(server_fd = socket(AF_INET, SOCK_STREAM, 0) < 0){
+     if((server_fd = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0){
           printf("server socket not created\n");
           exit(-1);
      }
+
      printf("Server address: %s port: %d\n",inet_ntoa(server_addr.sin_addr),ntohs(server_addr.sin_port));
      printf("server socket created\n");
      //connect to main server from this proxy server
-     if((connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr)))<0){
-          printf("server connection failed\n");
-          exit(-1);
+     if(connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr))<0){
+       perror("Error in connect");
+       exit(-1);
      }
-     printf("server address %s\n",inet_ntoa(server_addr.sin_addr));
-     printf("server socket connected\n");
+     //printf("server socket connected\n");
      while(1)
      {
           //receive data from client
@@ -75,7 +76,7 @@ int main(int argc,char *argv[]){
     char proxy_port[100];
     //socket variables
     int proxy_fd=0, client_fd=0;
-    struct sockaddr_in proxy_addr,server_addr;
+    struct sockaddr_in proxy_addr,server_addr,client_addr;
     struct info *info_ptr;
     if(argc!=2){
       printf("./proxy <portos>\n");
@@ -85,7 +86,7 @@ int main(int argc,char *argv[]){
      strcpy(proxy_port,argv[1]); // proxy port
      printf("proxy port is %s\n",proxy_port);
      // create a socket
-     if((proxy_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+     if((proxy_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0){
          printf("\nFailed to create socket");
          exit(-1);
      }
@@ -105,7 +106,8 @@ int main(int argc,char *argv[]){
      //accept all client connections continuously
      while(1)
      {
-          client_fd = accept(proxy_fd, (struct sockaddr*)NULL ,NULL);
+          int client_addr_size=sizeof(client_addr);
+          client_fd = accept(proxy_fd, (struct sockaddr*)&client_addr,(socklen_t *)&client_addr_size);
           printf("client no. %d connected\n",client_fd);
           if(client_fd > 0){
                 //multithreading variables
