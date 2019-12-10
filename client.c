@@ -12,12 +12,13 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include<errno.h>
 
 
 void erro(char *msg);
 
 int main(int argc, char *argv[]) {
-  char server_address[100],proxy_address[100],command[100],received[200];
+  char server_address[100],proxy_address[100],command[100],received[1000];
   int fd_proxy;
   struct sockaddr_in proxy_addr,server_addr;
   struct hostent *server_ptr,*proxy_ptr;
@@ -53,14 +54,16 @@ int main(int argc, char *argv[]) {
     write(fd_proxy,&server_addr,sizeof(server_addr));
     printf("Sending server_addr to Proxy successfull\n");
     while(1){
+      //read(fd_proxy,&received,sizeof(received));
+      //printf("%s\n",received);
       fgets(command,200,stdin);
       command[strlen(command)-1]='\0';
       if(strcmp(command,"LIST")==0){
         write(fd_proxy,command,sizeof(command));
+        printf("LISTA DE PROJETOS RECEBIDOS\n-----------------------------------------\n");
         read(fd_proxy,received,sizeof(received));
-        printf("LISTA DE PROJETOS RECEBIDOS\n-----------------------------------------");
         printf("%s",received);
-        printf("\n-----------------------------------------");
+        printf("-----------------------------------------\n");
       }
       else if(strncmp(command,"DOWNLOAD",8)==0){
         write(fd_proxy,command,sizeof(command));

@@ -43,14 +43,12 @@ int main(int argc, char *argv[]) {
 
   if ( (fd = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0)
 	   erro("in socket function");
-  printf("Socket created\n");
   if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0)
 	   erro("in bind function");
-  printf("Bind successfull\n");
   if( listen(fd, 5) < 0)
 	   erro("in listen function");
-  printf("Listen successfull\n");
   client_addr_size = sizeof(client_addr);
+  printf("Server ready to receive: \nAddress: %s Port: %d\n",inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
   while (1) {
     //clean finished child processes, avoiding zombies
     //must use WNOHANG or would block whenever a child process was working
@@ -59,7 +57,7 @@ int main(int argc, char *argv[]) {
 
     client = accept(fd,(struct sockaddr *)&client_addr,(socklen_t *)&client_addr_size);
     //port=(int) ntohs(addr.sin_port);
-    printf("Client address: %s port: %d\n",inet_ntoa(addr.sin_addr),ntohs(addr.sin_port));
+    printf("Client %d connected\n",client);
     if (client > 0) {
       if (fork() == 0) {
         close(fd);
@@ -85,36 +83,35 @@ void process_client(int client_fd)
 
   memset(dados,-1,size*sizeof(int));
 
-  strcpy(message,"Insert command: ");
-  write(client_fd,message,sizeof(message));
+  //strcpy(message,"Insert command: ");
+  //write(client_fd,message,sizeof(message));
   while (1) {
     nread = read(client_fd, buffer, BUF_SIZE-1);
 	  buffer[nread] = '\0';
-      if (strncmp(buffer,"DOWNLOAD",8)==0){
-        //arranjar forma de enviar o ficheiro***********************************
+    if (strncmp(buffer,"DOWNLOAD",8)==0){
+      //arranjar forma de enviar o ficheiro***********************************
+    }
+    else if (strcmp(buffer,"LIST")==0){
+      // opendir() returns a pointer of DIR type.
+      directory = opendir("server_files");
+      if (directory == NULL){  // opendir returns NULL if couldn't open directory
+          printf("Couldn't open current directory;" );
       }
-      else if (strcmp(buffer,"LIST")==0){
-        // opendir() returns a pointer of DIR type.
-        directory = opendir("server_files");
-        if (directory == NULL){  // opendir returns NULL if couldn't open directory
-            printf("Couldn't open current directory;" );
-        }
-        memset(&str_list,'\0', sizeof(str_list));
-        while ((info_dir = readdir(directory)) != NULL){
-                sprintf(str_fich_info,"%s\n", info_dir->d_name);
-                strcat(str_list,str_fich_info);
-        }
-        printf("%s",str_list);
-
-
-        closedir(directory);
+      memset(&str_list,'\0', sizeof(str_list));
+      while ((info_dir = readdir(directory)) != NULL){
+        sprintf(str_fich_info,"%s\n", info_dir->d_name);
+        if (strcmp(str_fich_info,".\n")!=0 && strcmp(str_fich_info,"..\n")!=0)
+          strcat(str_list,str_fich_info);
       }
-      else if (strcmp(buffer,"Quit")==0){
-        printf("The client %d will now close.\n",client_fd);
-        fflush(stdout);
-      	close(client_fd);
-        exit(0);
-      }
+      write(client_fd,str_list,sizeof(str_list));
+      closedir(directory);
+    }
+    else if (strcmp(buffer,"QUIT")==0){
+      printf("The client %d will now close.\n",client_fd);
+      fflush(stdout);
+    	close(client_fd);
+      exit(0);
+    }
   }
 
 

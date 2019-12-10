@@ -20,7 +20,7 @@ void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
   int server_fd,client_fd=client_server.client_fd;
-  char buffer[65535],server_ip[100];
+  char buffer[10000],server_ip[100];
   int bytes=0;
 
      //code to connect to main server via this proxy server
@@ -29,9 +29,6 @@ void *new_client(void *info){
           printf("server socket not created\n");
           exit(-1);
      }
-
-     printf("Server address: %s port: %d\n",inet_ntoa(server_addr.sin_addr),ntohs(server_addr.sin_port));
-     printf("server socket created\n");
      //connect to main server from this proxy server
      if(connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr))<0){
        perror("Error in connect");
@@ -41,12 +38,15 @@ void *new_client(void *info){
      while(1)
      {
           //receive data from client
-          memset(&buffer, '\0', sizeof(buffer));
+          /*memset(&buffer, '\0', sizeof(buffer));
+          read(server_fd,&buffer,sizeof(buffer));
+          write(client_fd,&buffer,sizeof(buffer));
+          memset(&buffer, '\0', sizeof(buffer));*/
           bytes = read(client_fd, buffer, sizeof(buffer));
           if(bytes>0){
              // send data to main server
              write(server_fd, buffer, sizeof(buffer));
-             printf("From client:\n");
+             printf("From client:");
              fputs(buffer,stdout);
              fflush(stdout);
           }
@@ -56,12 +56,14 @@ void *new_client(void *info){
             //enviar o ficheiro*************************************************
           }
           else if(strcmp(buffer,"LIST")==0){
-            memset(&buffer, '\0', sizeof(buffer));
-            bytes = read(server_fd, buffer, sizeof(buffer));
+            memset(&buffer,'\0', sizeof(buffer));
+            bytes=read(server_fd, buffer, sizeof(buffer));
+            buffer[bytes]='\0';
             write(client_fd,buffer,sizeof(buffer));
           }
           else if(strcmp(buffer,"QUIT")==0){
             printf("The client thread %d will now close",client_fd);
+            write(server_fd,buffer,strlen(buffer)+1);
             close(client_fd);
             pthread_exit(NULL);
           }
@@ -112,6 +114,7 @@ int main(int argc,char *argv[]){
           if(client_fd > 0){
                 //multithreading variables
                 read(client_fd,&server_addr,sizeof(server_addr));
+                printf("Server info received\nServer address: %s port: %d\n",inet_ntoa(server_addr.sin_addr),ntohs(server_addr.sin_port));
                 info_ptr=(struct info*)malloc(sizeof(struct info));
                 info_ptr->server_addr=server_addr;
                 info_ptr->client_fd=client_fd;
