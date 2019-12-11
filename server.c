@@ -54,7 +54,6 @@ int main(int argc, char *argv[]) {
     //must use WNOHANG or would block whenever a child process was working
     while(waitpid(-1,NULL,WNOHANG)>0);
     //wait for new connection
-
     client = accept(fd,(struct sockaddr *)&client_addr,(socklen_t *)&client_addr_size);
     //port=(int) ntohs(addr.sin_port);
     printf("Client %d connected\n",client);
@@ -74,24 +73,59 @@ void process_client(int client_fd)
 {
 	int nread = 0,size=10,i;
 	char buffer[BUF_SIZE],*token,message[90];
-  char str_list[10000],str_fich_info[257];
+  char str_list[10000],str_fich_info[257],command[10000],file_name[100];
   int dados[size];
   int sum=0,flag=0;
   double ave=0;
   struct dirent *info_dir;  // Pointer for directory entry
   DIR *directory;
+  FILE *f;
 
   memset(dados,-1,size*sizeof(int));
 
   //strcpy(message,"Insert command: ");
   //write(client_fd,message,sizeof(message));
   while (1) {
-    nread = read(client_fd, buffer, BUF_SIZE-1);
-	  buffer[nread] = '\0';
-    if (strncmp(buffer,"DOWNLOAD",8)==0){
-      //arranjar forma de enviar o ficheiro***********************************
+    nread =read(client_fd,command,sizeof(command));
+	  command[nread] = '\0';
+    printf("From client %d: %s\n",client_fd,command);
+    if (strncmp(command,"DOWNLOAD",8)==0){
+      //arranjar forma de enviar o ficheiro*************************************
+      if(strncmp(command+9,"TCP",3)==0){
+        if(strncmp(command+9+4,"NOR",3)==0){
+          token=strtok(command," ");
+          token=strtok(NULL," ");
+          token=strtok(NULL," ");
+          token=strtok(NULL," ");
+          strcpy(file_name,"server_files/");
+          strcat(file_name,token);
+          if((f=fopen(file_name,"rb"))==NULL){
+            strcpy(buffer,"The file request doesn't exist. Try LIST to obtain the available files.");
+            write(client_fd,buffer,sizeof(buffer));
+          }
+          else{
+            memset(buffer,'\0',sizeof(buffer));
+            while(fread(buffer,1,sizeof(buffer),f)!=0){
+              write(client_fd,buffer,sizeof(buffer));
+              memset(buffer,'\0',sizeof(buffer));
+            }
+            strcpy(buffer,"EOF");
+            write(client_fd,buffer,sizeof(buffer));
+          }
+        }
+        else{
+          //encriptar
+        }
+      }
+      else if(strncmp(command+9,"UDP",3)==0){
+        if(strncmp(command+9+4,"NOR",3)==0){
+        }
+        else{
+          //encriptar
+        }
+      }
     }
-    else if (strcmp(buffer,"LIST")==0){
+    else if (strcmp(command,"LIST")==0){
       // opendir() returns a pointer of DIR type.
       directory = opendir("server_files");
       if (directory == NULL){  // opendir returns NULL if couldn't open directory
@@ -106,7 +140,7 @@ void process_client(int client_fd)
       write(client_fd,str_list,sizeof(str_list));
       closedir(directory);
     }
-    else if (strcmp(buffer,"QUIT")==0){
+    else if (strcmp(command,"QUIT")==0){
       printf("The client %d will now close.\n",client_fd);
       fflush(stdout);
     	close(client_fd);

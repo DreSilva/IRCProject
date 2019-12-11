@@ -20,7 +20,7 @@ void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
   int server_fd,client_fd=client_server.client_fd;
-  char buffer[10000],server_ip[100];
+  char buffer[1024],command[10000],server_ip[100];
   int bytes=0;
 
      //code to connect to main server via this proxy server
@@ -35,40 +35,51 @@ void *new_client(void *info){
        exit(-1);
      }
      //printf("server socket connected\n");
-     while(1)
-     {
-          //receive data from client
-          /*memset(&buffer, '\0', sizeof(buffer));
-          read(server_fd,&buffer,sizeof(buffer));
-          write(client_fd,&buffer,sizeof(buffer));
-          memset(&buffer, '\0', sizeof(buffer));*/
-          bytes = read(client_fd, buffer, sizeof(buffer));
+     while(1){
+          bytes = read(client_fd,command,sizeof(command));
           if(bytes>0){
              // send data to main server
-             write(server_fd, buffer, sizeof(buffer));
-             printf("From client:");
-             fputs(buffer,stdout);
+             write(server_fd,command, sizeof(command));
+             printf("From client %d: %s\n",client_fd,command);
              fflush(stdout);
           }
           //receive response from server
-          if(strncmp(buffer,"DOWNLOAD",8)==0){
-            memset(&buffer, '\0', sizeof(buffer));
+          if(strncmp(command,"DOWNLOAD",8)==0){
             //enviar o ficheiro*************************************************
+            if(strncmp(command+9,"TCP",3)==0){
+              if(strncmp(command+9+4,"NOR",3)==0){
+                do{
+                  memset(buffer,'\0',sizeof(buffer));
+                  read(server_fd,buffer, sizeof(buffer));
+                  write(client_fd,buffer, sizeof(buffer));
+                }while(strcmp(buffer,"EOF")!=0);
+              }
+              else{
+                //encriptar
+              }
+            }
+            else if(strncmp(command+9,"UDP",3)==0){
+              if(strncmp(command+9+4,"NOR",3)==0){
+              }
+              else{
+                //encriptar
+              }
+            }
+
           }
-          else if(strcmp(buffer,"LIST")==0){
-            memset(&buffer,'\0', sizeof(buffer));
+          else if(strcmp(command,"LIST")==0){
+            memset(&command,'\0', sizeof(command));
             bytes=read(server_fd, buffer, sizeof(buffer));
             buffer[bytes]='\0';
             write(client_fd,buffer,sizeof(buffer));
           }
-          else if(strcmp(buffer,"QUIT")==0){
+          else if(strcmp(command,"QUIT")==0){
             printf("The client thread %d will now close",client_fd);
             write(server_fd,buffer,strlen(buffer)+1);
             close(client_fd);
             pthread_exit(NULL);
           }
-     };
-  return NULL;
+     }
 }
 // main entry point
 int main(int argc,char *argv[]){
