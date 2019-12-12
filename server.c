@@ -69,8 +69,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void process_client(int client_fd)
-{
+void process_client(int client_fd){
 	int nread = 0,size=10,i;
 	char buffer[BUF_SIZE],*token,message[90];
   char str_list[10000],str_fich_info[257],command[10000],file_name[100];
@@ -138,6 +137,7 @@ void process_client(int client_fd)
           strcat(str_list,str_fich_info);
       }
       write(client_fd,str_list,sizeof(str_list));
+      printf("%s\n",str_list);
       closedir(directory);
     }
     else if (strcmp(command,"QUIT")==0){
@@ -151,8 +151,7 @@ void process_client(int client_fd)
 
 }
 
-void erro(char *msg)
-{
+void erro(char *msg){
 	printf("Erro: %s\n", msg);
 	exit(-1);
 }
