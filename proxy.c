@@ -77,7 +77,7 @@ void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
   int server_fd,client_fd=client_server.client_fd;
-  char buffer[1024],command[10000],server_ip[100];
+  char buffer[10000],command[10000],server_ip[100];
   int bytes=0;
 
      //code to connect to main server via this proxy server
@@ -125,11 +125,11 @@ void *new_client(void *info){
 
           }
           else if(strcmp(command,"LIST")==0){
+            memset(&buffer,'\0', sizeof(buffer));
             memset(&command,'\0', sizeof(command));
             bytes=read(server_fd, buffer, sizeof(buffer));
-            printf("%s\n",buffer);
+            printf("%s %d\n",buffer,bytes);
             write(client_fd,buffer,sizeof(buffer));
-            memset(&buffer,'\0', sizeof(buffer));
           }
           else if(strcmp(command,"QUIT")==0){
             printf("The client thread %d will now close\n",client_fd);

@@ -20,7 +20,7 @@
 void erro(char *msg);
 
 int main(int argc, char *argv[]) {
-  char server_address[100],proxy_address[100],command[100],received[1024],file_name_path[100];
+  char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100];
   char *token,*file_name,*protocol;
   int fd_proxy,total_received_bytes=0,nread;
   double total_download_time;

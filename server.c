@@ -125,12 +125,12 @@ void process_client(int client_fd){
       }
     }
     else if (strcmp(command,"LIST")==0){
+      memset(&str_list,'\0', sizeof(str_list));
       // opendir() returns a pointer of DIR type.
       directory = opendir("server_files");
       if (directory == NULL){  // opendir returns NULL if couldn't open directory
           printf("Couldn't open current directory;" );
       }
-      memset(&str_list,'\0', sizeof(str_list));
       while ((info_dir = readdir(directory)) != NULL){
         sprintf(str_fich_info,"%s\n", info_dir->d_name);
         if (strcmp(str_fich_info,".\n")!=0 && strcmp(str_fich_info,"..\n")!=0)
