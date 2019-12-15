@@ -24,6 +24,7 @@ struct connection{
 struct info{
   int client_fd;
   struct sockaddr_in server_addr;
+  struct sockaddr_in proxy_addr;
   struct sockaddr_in client_addr;
 };
 
@@ -77,8 +78,9 @@ void print_connection_list(struct connection* head){
 void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
+  struct sockaddr_in proxy_addr =client_server.proxy_addr;
   struct sockaddr_in client_addr =client_server.client_addr;
-  int server_fd,server_fd_udp,client_fd_udp,client_fd =client_server.client_fd;
+  int server_fd,proxy_fd_udp,client_fd =client_server.client_fd;
   char buffer[10000],command[100],server_ip[100];
   int bytes=0,len_addr;
 
@@ -88,17 +90,13 @@ void *new_client(void *info){
           printf("server tcp socket not created\n");
           exit(-1);
      }
-     if((client_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+     if((proxy_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
           printf("client udp socket not created\n");
           exit(-1);
      }
-     if((bind(client_fd_udp, (struct sockaddr*)&client_addr,sizeof(client_addr))) < 0){
+     if((bind(proxy_fd_udp, (struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0){
         printf("Failed to bind a socket client_fd_udp\n");
         exit(-1);
-     }
-     if((server_fd_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
-          printf("server udp socket not created\n");
-          exit(-1);
      }
      /*if((bind(server_fd_udp, (struct sockaddr*)&server_addr,sizeof(server_addr))) < 0){
         printf("Failed to bind a socket server_fd_udp\n");
@@ -136,9 +134,9 @@ void *new_client(void *info){
               if(strncmp(command+9+4,"NOR",3)==0){
                 memset(buffer,'\0',sizeof(buffer));
                 len_addr=sizeof(server_addr);
-                recvfrom(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
+                recvfrom(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
                 printf("%s\n",buffer);
-                sendto(client_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
+                sendto(proxy_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
               }
               else{
                 //encriptar

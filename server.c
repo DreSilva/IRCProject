@@ -20,6 +20,7 @@
 
 struct info{
   int client_fd;
+  struct sockaddr_in server_addr;
   struct sockaddr_in client_addr;
 };
 
@@ -33,16 +34,17 @@ void *new_client(void *info){
 	int nread = 0,size=10,i;
 	char buffer[10000],*token;
   char str_list[10000],str_fich_info[257],command[10000],file_name[100];
-  int dados[size],client_fd_udp,client_fd=client_server.client_fd;
+  int dados[size],server_fd_udp,client_fd=client_server.client_fd;
   struct dirent *info_dir;  // Pointer for directory entry
   DIR *directory;
   FILE *f;
+  struct sockaddr_in server_addr=client_server.server_addr;
   struct sockaddr_in client_addr=client_server.client_addr;
-  if((client_fd_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
-       printf("client udp socket not created\n");
+  if((server_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+       printf("server udp socket not created\n");
        exit(-1);
   }
-  if((bind(client_fd_udp,(struct sockaddr*)&client_addr,sizeof(client_addr))) < 0){
+  if((bind(server_fd_udp,(struct sockaddr*)&server_addr,sizeof(server_addr))) < 0){
      printf("Failed to bind a socket\n");
      exit(-1);
   }
@@ -91,17 +93,18 @@ void *new_client(void *info){
           strcat(file_name,token);
           if((f=fopen(file_name,"rb"))==NULL){
             strcpy(buffer,"The file request doesn't exist. Try LIST to obtain the available files.");
-            sendto(client_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+            sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
           }
           else{
             memset(buffer,'\0',sizeof(buffer));
             while(fread(buffer,1,1,f)!=0){
               printf("%s\n",buffer);
-              sendto(client_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+              sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+              perror("sendto");
               memset(buffer,'\0',sizeof(buffer));
             }
             strcpy(buffer,"EOF");
-            sendto(client_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+            sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
           }
         }
         else{
@@ -172,6 +175,7 @@ int main(int argc, char *argv[]) {
     if (client > 0) {
       info_ptr=(struct info*)malloc(sizeof(struct info));
       info_ptr->client_fd=client;
+      info_ptr->server_addr=addr;
       info_ptr->client_addr=client_addr;
       pthread_create(&tid, NULL,new_client, (void *)info_ptr);
     }

@@ -20,7 +20,7 @@
 void erro(char *msg);
 
 int main(int argc, char *argv[]) {
-  char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100],received_byte[10000];
+  char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100];
   char *token,*file_name,*protocol;
   int fd_proxy,total_received_bytes=0,nread,fd_proxy_udp,len_addr;
   double total_download_time;
@@ -93,9 +93,8 @@ int main(int argc, char *argv[]) {
                 break;
               }
               else{
-                received[nread]='\0';
                 total_received_bytes+=strlen(received);
-                fprintf(f,"%s",received);
+                fwrite(received,1,sizeof(received),f);
               }
             }while(strcmp(received,"EOF")!=0);
             fclose(f);
@@ -126,8 +125,9 @@ int main(int argc, char *argv[]) {
             f=fopen(file_name_path,"ab");
             do{
               len_addr=sizeof(proxy_addr);
-              nread=recvfrom(fd_proxy_udp,received_byte,sizeof(received_byte),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
+              nread=recvfrom(fd_proxy_udp,received,sizeof(received),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
               if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
+                remove(file_name_path);
                 printf("%s\n",received);
                 break;
               }
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
               }
               else{
                 total_received_bytes+=strlen(received);
-                fprintf(f,"%s",received);
+                fwrite(received,1,sizeof(received),f);
               }
             }while(strcmp(received,"EOF")!=0);
             fclose(f);
