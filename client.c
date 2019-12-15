@@ -20,9 +20,9 @@
 void erro(char *msg);
 
 int main(int argc, char *argv[]) {
-  char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100];
+  char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100],received_byte[10000];
   char *token,*file_name,*protocol;
-  int fd_proxy,total_received_bytes=0,nread;
+  int fd_proxy,total_received_bytes=0,nread,fd_proxy_udp,len_addr;
   double total_download_time;
   struct sockaddr_in proxy_addr,server_addr;
   struct hostent *server_ptr,*proxy_ptr;
@@ -34,12 +34,6 @@ int main(int argc, char *argv[]) {
   }
   strcpy(proxy_address, argv[1]);
   strcpy(server_address, argv[2]);
-  /*strcpy(server_address, argv[2]);
-  if ((server_ptr = gethostbyname(server_address)) == 0)
-    	erro("Was not able to obtain server address");
-  strcpy(proxy_address, argv[1]);
-  if ((proxy_ptr = gethostbyname(proxy_address)) == 0)
-    	erro("Was not able to obtain proxy address");*/
 
   bzero((void *) &proxy_addr, sizeof(proxy_addr));
   proxy_addr.sin_family = AF_INET;
@@ -53,6 +47,8 @@ int main(int argc, char *argv[]) {
   if(strcmp(argv[4],"TCP")==0){
     if((fd_proxy = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP)) == -1)
   	 erro("Error creating socket");
+     if((fd_proxy_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) == -1)
+   	 erro("Error creating socket udp");
     if( connect(fd_proxy,(struct sockaddr*)&proxy_addr,sizeof(proxy_addr)) < 0)
   	 erro("Error on connection to the proxy");
 
@@ -85,12 +81,12 @@ int main(int argc, char *argv[]) {
             strcpy(file_name_path,"downloads/");
             strcat(file_name_path,file_name);
             remove(file_name_path);
-            puts(file_name_path);
             f=fopen(file_name_path,"ab");
             do{
               nread=read(fd_proxy,received,sizeof(received));
               if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
                 printf("%s\n",received);
+                remove(file_name_path);
                 break;
               }
               if(strcmp(received,"EOF")==0){
@@ -119,6 +115,39 @@ int main(int argc, char *argv[]) {
         }
         else if(strncmp(command+9,"UDP",3)==0){
           //********************************************************************
+          if(strncmp(command+9+4,"NOR",3)==0){
+            token=strtok(command," ");
+            protocol=strtok(NULL," ");
+            token=strtok(NULL," ");
+            file_name=strtok(NULL," ");
+            strcpy(file_name_path,"downloads/");
+            strcat(file_name_path,file_name);
+            remove(file_name_path);
+            f=fopen(file_name_path,"ab");
+            do{
+              len_addr=sizeof(proxy_addr);
+              nread=recvfrom(fd_proxy_udp,received_byte,sizeof(received_byte),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
+              if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
+                printf("%s\n",received);
+                break;
+              }
+              if(strcmp(received,"EOF")==0){
+                break;
+              }
+              else{
+                total_received_bytes+=strlen(received);
+                fprintf(f,"%s",received);
+              }
+            }while(strcmp(received,"EOF")!=0);
+            fclose(f);
+            gettimeofday(&final_time, NULL);
+            total_download_time=final_time.tv_usec-inicial_time.tv_usec;
+            printf("File name: %s\n",file_name);
+            printf("Total received bytes: %d\n",total_received_bytes);
+            printf("Protocol: %s\n",protocol);
+            printf("Total download time: %lf us\n",total_download_time);
+            total_received_bytes=0;
+          }
         }
       }
       else if(strcmp(command,"QUIT")==0){

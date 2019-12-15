@@ -24,6 +24,7 @@ struct connection{
 struct info{
   int client_fd;
   struct sockaddr_in server_addr;
+  struct sockaddr_in client_addr;
 };
 
 struct connection* create_list_connection(){
@@ -76,16 +77,33 @@ void print_connection_list(struct connection* head){
 void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
-  int server_fd,client_fd=client_server.client_fd;
-  char buffer[10000],command[10000],server_ip[100];
-  int bytes=0;
+  struct sockaddr_in client_addr =client_server.client_addr;
+  int server_fd,server_fd_udp,client_fd_udp,client_fd =client_server.client_fd;
+  char buffer[10000],command[100],server_ip[100];
+  int bytes=0,len_addr;
 
      //code to connect to main server via this proxy server
      // create a socket
-     if((server_fd = socket(AF_INET, SOCK_STREAM,IPPROTO_TCP)) < 0){
-          printf("server socket not created\n");
+     if((server_fd = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP)) < 0){
+          printf("server tcp socket not created\n");
           exit(-1);
      }
+     if((client_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+          printf("client udp socket not created\n");
+          exit(-1);
+     }
+     if((bind(client_fd_udp, (struct sockaddr*)&client_addr,sizeof(client_addr))) < 0){
+        printf("Failed to bind a socket client_fd_udp\n");
+        exit(-1);
+     }
+     if((server_fd_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+          printf("server udp socket not created\n");
+          exit(-1);
+     }
+     /*if((bind(server_fd_udp, (struct sockaddr*)&server_addr,sizeof(server_addr))) < 0){
+        printf("Failed to bind a socket server_fd_udp\n");
+        exit(-1);
+     }*/
      //connect to main server from this proxy server
      if(connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr))<0){
        perror("Error in connect");
@@ -109,14 +127,18 @@ void *new_client(void *info){
                   memset(buffer,'\0',sizeof(buffer));
                   read(server_fd,buffer, sizeof(buffer));
                   write(client_fd,buffer, sizeof(buffer));
-                }while(strcmp(buffer,"EOF")!=0);
-              }
+                }while(strcmp(buffer,"EOF")!=0);              }
               else{
                 //encriptar
               }
             }
             else if(strncmp(command+9,"UDP",3)==0){
               if(strncmp(command+9+4,"NOR",3)==0){
+                memset(buffer,'\0',sizeof(buffer));
+                len_addr=sizeof(server_addr);
+                recvfrom(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
+                printf("%s\n",buffer);
+                sendto(client_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
               }
               else{
                 //encriptar
@@ -128,7 +150,6 @@ void *new_client(void *info){
             memset(&buffer,'\0', sizeof(buffer));
             memset(&command,'\0', sizeof(command));
             bytes=read(server_fd, buffer, sizeof(buffer));
-            printf("%s %d\n",buffer,bytes);
             write(client_fd,buffer,sizeof(buffer));
           }
           else if(strcmp(command,"QUIT")==0){
@@ -176,7 +197,7 @@ int main(int argc,char *argv[]){
     char *hostname = argv[1];
     char proxy_port[100];
     //socket variables
-    int proxy_fd=0, client_fd=0;
+    int proxy_fd=0, client_fd=0, proxy_fd_udp=0;
     struct sockaddr_in proxy_addr,server_addr,client_addr;
     struct info *info_ptr;
     connection_list=create_list_connection();
@@ -192,6 +213,10 @@ int main(int argc,char *argv[]){
          printf("Failed to create socket\n");
          exit(-1);
      }
+     if((proxy_fd_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
+         printf("Failed to create socket udp\n");
+         exit(-1);
+     }
      printf("Proxy initialize\n");
      pthread_create(&tid,NULL,proxy_read,NULL);
      memset(&proxy_addr, 0, sizeof(proxy_addr));
@@ -203,7 +228,11 @@ int main(int argc,char *argv[]){
      if((bind(proxy_fd, (struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0){
         printf("Failed to bind a socket\n");
         exit(-1);
-    }
+     }
+     if((bind(proxy_fd_udp, (struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0){
+        printf("Failed to bind a socket\n");
+        exit(-1);
+     }
 
      // start listening to the port for new connections
      if((listen(proxy_fd, SOMAXCONN)) < 0)
@@ -221,8 +250,9 @@ int main(int argc,char *argv[]){
                 info_ptr=(struct info*)malloc(sizeof(struct info));
                 info_ptr->server_addr=server_addr;
                 info_ptr->client_fd=client_fd;
+                info_ptr->client_addr=client_addr;
                 add_connection_to_list(connection_list,inet_ntoa(client_addr.sin_addr),inet_ntoa(server_addr.sin_addr),ntohs(client_addr.sin_port),ntohs(server_addr.sin_port),client_fd);
-                pthread_create(&tid, NULL, new_client, (void *)info_ptr);
+                pthread_create(&tid, NULL,new_client, (void *)info_ptr);
                 sleep(1);
           }
      }
