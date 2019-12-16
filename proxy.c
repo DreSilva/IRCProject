@@ -79,9 +79,10 @@ void print_connection_list(struct connection* head){
 void *new_client(void *info){
   struct info client_server = *(struct info*)info;
   struct sockaddr_in server_addr =client_server.server_addr;
+  struct sockaddr_in client_udp_addr,server_udp_addr;
   struct sockaddr_in proxy_addr =client_server.proxy_addr;
   struct sockaddr_in client_addr =client_server.client_addr;
-  int server_fd,proxy_fd_udp,client_fd =client_server.client_fd;
+  int server_fd,server_fd_udp,client_fd_udp,client_fd =client_server.client_fd;
   char buffer[10000],command[100],server_ip[100];
   int bytes=0,len_addr,random,nread;
   FILE* f;
@@ -92,18 +93,10 @@ void *new_client(void *info){
           printf("server tcp socket not created\n");
           exit(-1);
      }
-     if((proxy_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+     if((client_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
           printf("client udp socket not created\n");
           exit(-1);
      }
-     if((bind(proxy_fd_udp, (struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0){
-        printf("Failed to bind a socket client_fd_udp\n");
-        exit(-1);
-     }
-     /*if((bind(server_fd_udp, (struct sockaddr*)&server_addr,sizeof(server_addr))) < 0){
-        printf("Failed to bind a socket server_fd_udp\n");
-        exit(-1);
-     }*/
      //connect to main server from this proxy server
      if(connect(server_fd, (struct sockaddr*)&server_addr,(socklen_t)sizeof(server_addr))<0){
        perror("Error in connect");
@@ -139,18 +132,31 @@ void *new_client(void *info){
               }
             }
             else if(strncmp(command+9,"UDP",3)==0){
+              bzero((void *) &server_udp_addr, sizeof(server_udp_addr));
+              server_udp_addr=server_addr;
+              if((server_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+                   printf("client udp socket not created\n");
+                   exit(-1);
+              }
+              if((bind(server_fd_udp, (struct sockaddr*)&server_udp_addr,sizeof(server_udp_addr))) < 0){
+                 printf("Failed to bind a socket client_fd_udp\n");
+                 exit(-1);
+              }
               if(strncmp(command+9+4,"NOR",3)==0){
-                memset(buffer,'\0',sizeof(buffer));
-                len_addr=sizeof(server_addr);
-                recvfrom(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
-                printf("%s\n",buffer);
-                if(save_flag==1){
-                  fwrite(buffer,1,1,f);
-                }
-                srand(time(NULL));
-                random=rand()%100+1;
-                if(strcmp(buffer,"EOF")==0 || strcmp(buffer,"The file requested doesn't exist. Try LIST to obtain the available files.")==0 ||random>losses)
-                sendto(proxy_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
+                do{
+                  memset(buffer,'\0',sizeof(buffer));
+                  len_addr=sizeof(server_addr);
+                  recvfrom(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
+                  printf("%s\n",buffer);
+                  if(save_flag==1){
+                    fwrite(buffer,1,1,f);
+                  }
+                  srand(time(NULL));
+                  random=rand()%100+1;
+                  if(strcmp(buffer,"EOF")==0 || strcmp(buffer,"The file requested doesn't exist. Try LIST to obtain the available files.")==0 ||random>losses)
+                    sendto(client_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
+                }while(strcmp(buffer,"EOF")==0);
+                close(server_fd);
               }
               else{
                 //encriptar

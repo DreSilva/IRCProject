@@ -26,7 +26,7 @@ struct info{
 
 void erro(char *msg);
 
-int max_number_of_clients;
+int max_number_of_clients,counter_clients=0;
 int server_port;
 
 void *new_client(void *info){
@@ -34,13 +34,14 @@ void *new_client(void *info){
 	int nread = 0,size=10,i;
 	char buffer[10000],*token;
   char str_list[10000],str_fich_info[257],command[10000],file_name[100];
-  int dados[size],server_fd_udp,client_fd=client_server.client_fd;
+  int dados[size],proxy_fd_udp,client_fd=client_server.client_fd;
   struct dirent *info_dir;  // Pointer for directory entry
   DIR *directory;
   FILE *f;
   struct sockaddr_in server_addr=client_server.server_addr;
   struct sockaddr_in client_addr=client_server.client_addr;
-  if((server_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
+  struct sockaddr_in proxy_udp_addr;
+  if((proxy_fd_udp= socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) < 0){
        printf("server udp socket not created\n");
        exit(-1);
   }
@@ -80,6 +81,8 @@ void *new_client(void *info){
         }
       }
       else if(strncmp(command+9,"UDP",3)==0){
+        bzero((void *) &proxy_udp_addr, sizeof(proxy_udp_addr));
+        proxy_udp_addr=client_addr;
         if(strncmp(command+9+4,"NOR",3)==0){
           token=strtok(command," ");
           token=strtok(NULL," ");
@@ -89,17 +92,17 @@ void *new_client(void *info){
           strcat(file_name,token);
           if((f=fopen(file_name,"rb"))==NULL){
             strcpy(buffer,"The file request doesn't exist. Try LIST to obtain the available files.");
-            sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+            sendto(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &proxy_udp_addr,sizeof(proxy_udp_addr));
           }
           else{
             memset(buffer,'\0',sizeof(buffer));
             while(fread(buffer,1,1,f)!=0){
               printf("%s\n",buffer);
-              sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+              sendto(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &proxy_udp_addr,sizeof(proxy_udp_addr));
               memset(buffer,'\0',sizeof(buffer));
             }
             strcpy(buffer,"EOF");
-            sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
+            sendto(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &proxy_udp_addr,sizeof(proxy_udp_addr));
           }
         }
         else{
@@ -125,6 +128,7 @@ void *new_client(void *info){
     }
     else if (strcmp(command,"QUIT")==0){
       printf("The client %d will now close.\n",client_fd);
+      counter_clients--;
       fflush(stdout);
     	close(client_fd);
       pthread_exit(NULL);
@@ -160,19 +164,19 @@ int main(int argc, char *argv[]) {
   client_addr_size = sizeof(client_addr);
   printf("Server ready to receive: \nAddress: %s Port: %d\n",inet_ntoa(addr.sin_addr),ntohs(addr.sin_port));
   while (1) {
-    //clean finished child processes, avoiding zombies
-    //must use WNOHANG or would block whenever a child process was working
-    while(waitpid(-1,NULL,WNOHANG)>0);
-    //wait for new connection
-    client = accept(fd,(struct sockaddr *)&client_addr,(socklen_t *)&client_addr_size);
-    //port=(int) ntohs(addr.sin_port);
-    printf("Client %d connected\n",client);
-    if (client > 0) {
-      info_ptr=(struct info*)malloc(sizeof(struct info));
-      info_ptr->client_fd=client;
-      info_ptr->server_addr=addr;
-      info_ptr->client_addr=client_addr;
-      pthread_create(&tid, NULL,new_client, (void *)info_ptr);
+    if(counter_clients<max_number_of_clients){
+      //wait for new connection
+      client = accept(fd,(struct sockaddr *)&client_addr,(socklen_t *)&client_addr_size);
+      //port=(int) ntohs(addr.sin_port);
+      printf("Client %d connected\n",client);
+      if (client > 0) {
+        info_ptr=(struct info*)malloc(sizeof(struct info));
+        info_ptr->client_fd=client;
+        info_ptr->server_addr=addr;
+        info_ptr->client_addr=client_addr;
+        pthread_create(&tid, NULL,new_client, (void *)info_ptr);
+        counter_clients++;
+      }
     }
   }
   return 0;
