@@ -83,7 +83,7 @@ void *new_client(void *info){
   struct sockaddr_in client_addr =client_server.client_addr;
   int server_fd,proxy_fd_udp,client_fd =client_server.client_fd;
   char buffer[10000],command[100],server_ip[100];
-  int bytes=0,len_addr,random;
+  int bytes=0,len_addr,random,nread;
   FILE* f;
 
      //code to connect to main server via this proxy server
@@ -127,9 +127,9 @@ void *new_client(void *info){
               if(strncmp(command+9+4,"NOR",3)==0){
                 do{
                   memset(buffer,'\0',sizeof(buffer));
-                  read(server_fd,buffer, sizeof(buffer));
+                  nread=read(server_fd,buffer, sizeof(buffer));
                   if(save_flag==1){
-                    fwrite(buffer,1,strlen(buffer),f);
+                    fwrite(buffer,1,nread,f);
                   }
                   write(client_fd,buffer, sizeof(buffer));
                 }while(strcmp(buffer,"EOF")!=0);

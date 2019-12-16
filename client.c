@@ -97,8 +97,14 @@ int main(int argc, char *argv[]) {
                 break;
               }
               else{
-                total_received_bytes+=strlen(received);
-                fwrite(received,1,sizeof(received),f);
+                if(strstr(file_name_path,".txt")!=NULL){
+                  total_received_bytes+=strlen(received);
+                  fwrite(received,1,strlen(received),f);
+                }
+                else{
+                  total_received_bytes+=sizeof(received);
+                  fwrite(received,1,sizeof(received),f);
+                }
               }
             }while(strcmp(received,"EOF")!=0);
             fclose(f);
@@ -128,6 +134,7 @@ int main(int argc, char *argv[]) {
             remove(file_name_path);
             f=fopen(file_name_path,"ab");
             do{
+              memset(received,'\0',sizeof(received));
               len_addr=sizeof(proxy_addr);
               nread=recvfrom(client_fd_udp,received,sizeof(received),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
               if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
@@ -139,8 +146,14 @@ int main(int argc, char *argv[]) {
                 break;
               }
               else{
-                total_received_bytes+=strlen(received);
-                fwrite(received,1,strlen(received),f);
+                if(strstr(file_name_path,".txt")!=NULL){
+                  total_received_bytes+=strlen(received);
+                  fwrite(received,1,strlen(received),f);
+                }
+                else{
+                  total_received_bytes+=sizeof(received);
+                  fwrite(received,1,nread,f);
+                }
               }
             }while(strcmp(received,"EOF")!=0);
             fclose(f);
