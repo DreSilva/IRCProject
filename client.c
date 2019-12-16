@@ -22,7 +22,7 @@ void erro(char *msg);
 int main(int argc, char *argv[]) {
   char server_address[100],proxy_address[100],command[100],received[10000],file_name_path[100];
   char *token,*file_name,*protocol;
-  int fd_proxy,total_received_bytes=0,nread,fd_proxy_udp,len_addr;
+  int fd_proxy,total_received_bytes=0,nread,client_fd_udp,len_addr;
   double total_download_time;
   struct sockaddr_in proxy_addr,server_addr;
   struct hostent *server_ptr,*proxy_ptr;
@@ -47,9 +47,13 @@ int main(int argc, char *argv[]) {
   if(strcmp(argv[4],"TCP")==0){
     if((fd_proxy = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP)) == -1)
   	 erro("Error creating socket");
-     if((fd_proxy_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) == -1)
+    /*if((client_fd_udp = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP)) == -1)
    	 erro("Error creating socket udp");
-    if( connect(fd_proxy,(struct sockaddr*)&proxy_addr,sizeof(proxy_addr)) < 0)
+    if((bind(client_fd_udp,(struct sockaddr*)&proxy_addr,sizeof(proxy_addr))) < 0){
+      printf("Failed to bind a socket udp\n");
+      exit(-1);
+    }*/
+    if(connect(fd_proxy,(struct sockaddr*)&proxy_addr,sizeof(proxy_addr)) < 0)
   	 erro("Error on connection to the proxy");
 
     printf("Sending server_addr to Proxy\n");
@@ -84,7 +88,7 @@ int main(int argc, char *argv[]) {
             f=fopen(file_name_path,"ab");
             do{
               nread=read(fd_proxy,received,sizeof(received));
-              if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
+              if(strcmp(received,"The file requested doesn't exist. Try LIST to obtain the available files.")==0){
                 printf("%s\n",received);
                 remove(file_name_path);
                 break;
@@ -125,7 +129,7 @@ int main(int argc, char *argv[]) {
             f=fopen(file_name_path,"ab");
             do{
               len_addr=sizeof(proxy_addr);
-              nread=recvfrom(fd_proxy_udp,received,sizeof(received),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
+              nread=recvfrom(client_fd_udp,received,sizeof(received),0,(struct sockaddr *) &proxy_addr, (socklen_t *)&len_addr);
               if(strcmp(received,"The file request doesn't exist. Try LIST to obtain the available files.")==0){
                 remove(file_name_path);
                 printf("%s\n",received);
@@ -136,7 +140,7 @@ int main(int argc, char *argv[]) {
               }
               else{
                 total_received_bytes+=strlen(received);
-                fwrite(received,1,sizeof(received),f);
+                fwrite(received,1,strlen(received),f);
               }
             }while(strcmp(received,"EOF")!=0);
             fclose(f);

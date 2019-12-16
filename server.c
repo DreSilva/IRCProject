@@ -44,10 +44,6 @@ void *new_client(void *info){
        printf("server udp socket not created\n");
        exit(-1);
   }
-  if((bind(server_fd_udp,(struct sockaddr*)&server_addr,sizeof(server_addr))) < 0){
-     printf("Failed to bind a socket\n");
-     exit(-1);
-  }
 
   //strcpy(message,"Insert command: ");
   //write(client_fd,message,sizeof(message));
@@ -66,7 +62,7 @@ void *new_client(void *info){
           strcpy(file_name,"server_files/");
           strcat(file_name,token);
           if((f=fopen(file_name,"rb"))==NULL){
-            strcpy(buffer,"The file request doesn't exist. Try LIST to obtain the available files.");
+            strcpy(buffer,"The file requested doesn't exist. Try LIST to obtain the available files.");
             write(client_fd,buffer,sizeof(buffer));
           }
           else{
@@ -100,7 +96,6 @@ void *new_client(void *info){
             while(fread(buffer,1,1,f)!=0){
               printf("%s\n",buffer);
               sendto(server_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &client_addr,sizeof(client_addr));
-              perror("sendto");
               memset(buffer,'\0',sizeof(buffer));
             }
             strcpy(buffer,"EOF");

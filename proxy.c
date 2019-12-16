@@ -9,6 +9,7 @@
 #include <netdb.h> //hostent
 #include <arpa/inet.h>
 #include <errno.h>
+#include <time.h>
 
 int save_flag;
 int losses;
@@ -82,7 +83,8 @@ void *new_client(void *info){
   struct sockaddr_in client_addr =client_server.client_addr;
   int server_fd,proxy_fd_udp,client_fd =client_server.client_fd;
   char buffer[10000],command[100],server_ip[100];
-  int bytes=0,len_addr;
+  int bytes=0,len_addr,random;
+  FILE* f;
 
      //code to connect to main server via this proxy server
      // create a socket
@@ -118,14 +120,20 @@ void *new_client(void *info){
           }
           //receive response from server
           if(strncmp(command,"DOWNLOAD",8)==0){
+            remove("proxy_file");
+            f=fopen("proxy_file","ab");
             //enviar o ficheiro*************************************************
             if(strncmp(command+9,"TCP",3)==0){
               if(strncmp(command+9+4,"NOR",3)==0){
                 do{
                   memset(buffer,'\0',sizeof(buffer));
                   read(server_fd,buffer, sizeof(buffer));
+                  if(save_flag==1){
+                    fwrite(buffer,1,strlen(buffer),f);
+                  }
                   write(client_fd,buffer, sizeof(buffer));
-                }while(strcmp(buffer,"EOF")!=0);              }
+                }while(strcmp(buffer,"EOF")!=0);
+              }
               else{
                 //encriptar
               }
@@ -136,13 +144,19 @@ void *new_client(void *info){
                 len_addr=sizeof(server_addr);
                 recvfrom(proxy_fd_udp,buffer,sizeof(buffer),0,(struct sockaddr *) &server_addr,(socklen_t *)&len_addr);
                 printf("%s\n",buffer);
+                if(save_flag==1){
+                  fwrite(buffer,1,1,f);
+                }
+                srand(time(NULL));
+                random=rand()%100+1;
+                if(strcmp(buffer,"EOF")==0 || strcmp(buffer,"The file requested doesn't exist. Try LIST to obtain the available files.")==0 ||random>losses)
                 sendto(proxy_fd_udp,buffer,sizeof(buffer), 0, (struct sockaddr *) &client_addr,sizeof(client_addr));
               }
               else{
                 //encriptar
               }
             }
-
+            fclose(f);
           }
           else if(strcmp(command,"LIST")==0){
             memset(&buffer,'\0', sizeof(buffer));
@@ -177,10 +191,14 @@ void *proxy_read(){
       print_connection_list(connection_list);
     }
     else if(strcmp(command,"SAVE")==0){
-      if(save_flag==0)
+      if(save_flag==0){
         save_flag=1;
-      else
+        printf("SAVE was activated\n");
+      }
+      else{
         save_flag=0;
+        printf("SAVE was deactivated\n");
+      }
     }
     else{
       printf("Wrong command\n");
